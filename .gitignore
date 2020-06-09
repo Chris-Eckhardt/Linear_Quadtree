@@ -1,0 +1,9 @@
+
+# C object files
+*.o
+
+# executable
+run
+
+# CUnit test results
+*.xml

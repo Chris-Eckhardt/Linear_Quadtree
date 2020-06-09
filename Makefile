@@ -9,4 +9,4 @@ window.o: window.c window.h
 	gcc -c window.c
 
 clean:
-	rm *.o run
+	rm *.o run TestResults-Listing.xml TestResults-Results.xml
