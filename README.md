@@ -1,3 +1,6 @@
+Author: Chris Eckhardt
+Description: This is my implementation of a linear quadtree. It's intended purpose is to be used in a GUI window management application to handle z-order of overlapping windows. 
+
 Glossary:
     window.c / window.h:
         contains quadtree implementaion
@@ -9,7 +12,7 @@ Glossary:
 To build:
     CUnit must be linked to the program after compilation, to get CUnit working on mac using brew type "brew install cunit" then "brew link cunit"
 
-    Make commands: 
+    Make commands:
         make - compiles the program and links cunit
         make clean - removes .o files and run executable
 
