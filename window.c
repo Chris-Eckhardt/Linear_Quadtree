@@ -1,6 +1,12 @@
 #include "window.h"
 
 
+
+int g_window_id 	= 0;
+
+VGA_WINDOW * window_list_head;
+VGA_WINDOW * window_list_tail;
+
 /* global var used for defining a windows id */
 int G_WINDOW_ID = 0;
 
@@ -46,25 +52,25 @@ BOUND get_intersection(BOUND * a, BOUND * b)
     BOUND intr = {0,0,0,0};
 
     // find x
-    if(a->x > b->x)
+    if(a->x >= b->x)
         intr.x = a->x;
     else
         intr.x = b->x;
 
     // find y
-    if(a->y > b->y)
+    if(a->y >= b->y)
         intr.y = a->y;
     else
         intr.y = b->y;
 
     // find width
-    if((a->x+a->width) < (b->x+b->width))
+    if((a->x+a->width) <= (b->x+b->width))
         intr.width = (a->x+a->width)-intr.x;
     else
         intr.width = (b->x+b->width)-intr.x;
 
     // find height
-    if((a->y+a->height) < (b->y+b->height))
+    if((a->y+a->height) <= (b->y+b->height))
         intr.height = (a->y+a->height)-intr.y;
     else
         intr.height = (b->y+b->height)-intr.y;
@@ -82,7 +88,10 @@ QNODE * create_qnode(int x, int y, int width, int height)
     QNODE * q = malloc( sizeof(QNODE) );
     q->hidden = 0;
     q->has_children = 0;
-    q->bound = create_bound(x,y,width,height);
+    q->bound.x = x;
+	q->bound.y = y;
+	q->bound.width = width;
+	q->bound.height = height;
     q->ne = NULL;
     q->nw = NULL;
     q->se = NULL;
@@ -132,16 +141,17 @@ int search_qtree(QNODE * q, int x, int y)
     if (q->hidden == 1) {
         return 1;
     }
-    else if (q->has_children) {
-        if (bound_contains(&(q->nw->bound), x, y))
-            return search_qtree(q->nw, x, y);
-        else if (bound_contains(&(q->ne->bound), x, y))
-            return search_qtree(q->ne, x, y);
-        else if (bound_contains(&(q->sw->bound), x, y))
-            return search_qtree(q->sw, x, y);
-        else if (bound_contains(&(q->se->bound), x, y))
-            return search_qtree(q->se, x, y);
-    }
+    else if (q->has_children)
+        {
+            if (q->nw && bound_contains(&(q->nw->bound), x, y))
+                return search_qtree(q->nw, x, y);
+            if (q->ne && bound_contains(&(q->ne->bound), x, y))
+                return search_qtree(q->ne, x, y);
+            if (q->sw && bound_contains(&(q->sw->bound), x, y))
+                return search_qtree(q->sw, x, y);
+            if (q->se && bound_contains(&(q->se->bound), x, y))
+                return search_qtree(q->se, x, y);
+        }
     return 0;
 }
 
@@ -155,28 +165,30 @@ void subdivide(QNODE * q, BOUND b)
     int w = q->bound.width;
     int h = q->bound.height;
 
-    int offsetx = 0;
-    int offsety = 0;
-    if(w%2 == 1)
-        offsetx = 1;
-    if(h%2 == 1)
-        offsety = 1;
+    BOUND nw = create_bound(x,y,(w/2),(h/2));
+    BOUND ne = create_bound(x+(w/2),y,(w/2),(h/2));
+    BOUND sw = create_bound(x,y+(h/2),(w/2),(h/2));
+    BOUND se = create_bound(x+(w/2),y+(h/2),(w/2),(h/2));
 
-    q->nw = create_qnode(x,y,w/2+offsetx,h/2+offsety);
-    if(bound_intersects(&(q->nw->bound),&b))
+    if(bound_intersects(&(nw),&b)) {
+        q->nw = create_qnode(nw.x,nw.y,nw.width,nw.height);
         check_qnode(q->nw, b);
+    }
 
-    q->ne = create_qnode(x+(w/2)+offsetx,y+offsety,w/2,h/2+offsety);
-    if(bound_intersects(&(q->ne->bound),&b))
+    if(bound_intersects(&(ne),&b)) {
+        q->ne = create_qnode(ne.x,ne.y,ne.width,ne.height);
         check_qnode(q->ne, b);
+    }
 
-    q->sw = create_qnode(x,y+(h/2)+offsety,w/2+offsetx,h/2);
-    if(bound_intersects(&(q->sw->bound),&b))
+    if(bound_intersects(&(sw),&b)) {
+        q->sw = create_qnode(sw.x,sw.y,sw.width,sw.height);
         check_qnode(q->sw, b);
+    }
 
-    q->se = create_qnode(x+(w/2)+offsetx,y+(h/2)+offsety,w/2,h/2);
-    if(bound_intersects(&(q->se->bound),&b))
+    if(bound_intersects(&(se),&b)) {
+        q->se = create_qnode(se.x,se.y,se.width,se.height);
         check_qnode(q->se, b);
+    }
 
 }
 
@@ -187,18 +199,34 @@ void check_qnode(QNODE * q, BOUND b)
     if(q->bound.width <= 1 || q->bound.height <= 1) {
         q->hidden = 1;
     }
-    else if(bound_intersects(&(q->bound), &b)) {
+    else if(!q->has_children && bound_intersects(&(q->bound), &b)) {
         subdivide(q, b);
     }
+    else {
+    if(!q->nw->hidden)
+        if(bound_intersects(&(q->nw->bound), &b))
+            check_qnode(q->nw, b);
+    if(!q->ne->hidden)       
+        if(bound_intersects(&(q->ne->bound), &b))
+            check_qnode(q->ne, b);
+    if(!q->sw->hidden)
+        if(bound_intersects(&(q->sw->bound), &b))
+            check_qnode(q->sw, b);
+    if(!q->se->hidden)
+        if(bound_intersects(&(q->se->bound), &b))
+            check_qnode(q->se, b);
+    }
 
+    // after return from recursive calls
+    
     if(q->has_children) {
         if(q->nw->hidden == 1 &&
             q->ne->hidden == 1 &&
             q->sw->hidden == 1 &&
             q->se->hidden == 1)
         {
-                destroy_children(q);
-                q->hidden = 1;
+            destroy_children(q);
+            q->hidden = 1;
         }
     }
 }
@@ -207,63 +235,85 @@ void check_qnode(QNODE * q, BOUND b)
 
 /************ WINDOW ******************/
 
-/* helper function for adding a new window to the 
-front of the circular linked-list */
-WINDOW * get_last_window()
-{
-    if(!WINDOW_LIST)
-        return NULL;
-    WINDOW * ptr = WINDOW_LIST;
-    while(ptr->next != WINDOW_LIST) {
-        ptr = ptr->next;
-    }
-    return ptr;
-}
-
 /* used to add a new window to the global window list */
-void add_window_to_list(WINDOW * w)
+void add_window_to_list(VGA_WINDOW * w)
 {
-    if(!WINDOW_LIST) {
-        WINDOW_LIST = w;
-        w->next = w;
+    if(!window_list_head) {
+        window_list_head = w;
+        window_list_tail = w;
     } else {
-        WINDOW * last = get_last_window();
-        last->next = w;
-        w->next = WINDOW_LIST;
-        WINDOW_LIST = w;
+        w->next = window_list_head;
+        window_list_head->prev = w;
+        window_list_head = w;
     }
 }
 
-WINDOW * create_window(int x, int y, int width, int height)
+void create_window ( PARAM_VGA_CREATE_WINDOW * params)
 {
-    WINDOW * w = malloc( sizeof(WINDOW) );
-    w->id = ++G_WINDOW_ID;
-    w->root = create_qnode(x, y, width, height);
-    add_window_to_list(w);
-    return w;
+	VGA_WINDOW * window = malloc( sizeof(VGA_WINDOW) );
+	window->id = g_window_id++;
+	params->window_id = window->id;
+	window->frame.bound.x = params->x-1;
+	window->frame.bound.y = params->y-10;
+	window->frame.bound.width = params->width+2;
+	window->frame.bound.height = params->height+11;
+	window->canvas.bound.x = params->x;
+	window->canvas.bound.y = params->y;
+	window->canvas.bound.width = params->width;
+	window->canvas.bound.height = params->height;
+    window->color = current_color++;
+
+    int bound_size = 1;
+    while (bound_size < window->frame.bound.width &&
+        bound_size < window->frame.bound.height) 
+        {
+            bound_size *= 2;
+        }
+
+	window->root = create_qnode(
+        window->frame.bound.x, 
+        window->frame.bound.y, 
+        bound_size, 
+        bound_size);
+
+    window->next = NULL;
+    window->prev = NULL;
+	add_window_to_list(window);
 }
 
 /*************** END WINDOW *************/
 
 /*************** TREE MANAGEMENT *************/
 
-void build_quadtrees()
+void reset_qtrees()
 {
-    if(!WINDOW_LIST)
-        return;
 
-    WINDOW * w_ptr = WINDOW_LIST->next;
+    VGA_WINDOW * w_ptr = window_list_head;
 
-    while(w_ptr != WINDOW_LIST) {
+    while(w_ptr != NULL){
         reset_root(w_ptr->root);
-
-        WINDOW * f_ptr = WINDOW_LIST;
-        while(f_ptr != w_ptr) {
-            check_qnode(w_ptr->root, f_ptr->root->bound);
-            f_ptr = f_ptr->next;
-        }
         w_ptr = w_ptr->next;
     }
 }
 
+void build_quadtrees()
+{
+    if(!window_list_tail)
+        return;
+
+    reset_qtrees();
+
+    VGA_WINDOW * w_ptr = window_list_tail;
+    VGA_WINDOW * f_ptr;
+
+    while(w_ptr != NULL) {
+
+        f_ptr = w_ptr->prev;
+        while(f_ptr != NULL) {
+            check_qnode(w_ptr->root, get_intersection(&(w_ptr->frame.bound), &(f_ptr->frame.bound)));
+            f_ptr = f_ptr->prev;
+        }
+        w_ptr = w_ptr->prev;
+    }
+}
 /*************** END TREE MANAGEMENT *********/
