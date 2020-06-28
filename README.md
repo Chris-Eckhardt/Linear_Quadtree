@@ -1,3 +1,6 @@
+## NOTE: This implementation is out of date and will be updated. 
+There is a major bug that occurrs when non-square windows are created (height != width). This bug has been fixed by padding the root quadtree node to make the dimenions equal and of a power of 2.
+
 # Author: 
 Chris Eckhardt
 # Description: 
